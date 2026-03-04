@@ -11,6 +11,74 @@ type GameState = 'idle' | 'playing' | 'paused' | 'gameover'
 const MASCOTS = ['🐹', '🐭', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁']
 const HIT_SOUNDS = ['💥', '⭐', '✨', '🔥', '⚡']
 
+// Funny sound effects using Web Audio API
+const playSound = (type: 'pop' | 'hit' | 'miss' | 'gameover' | 'score') => {
+  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+  const oscillator = audioCtx.createOscillator()
+  const gainNode = audioCtx.createGain()
+  
+  oscillator.connect(gainNode)
+  gainNode.connect(audioCtx.destination)
+  
+  switch (type) {
+    case 'pop':
+      // Pop sound - quick ascending
+      oscillator.frequency.setValueAtTime(300, audioCtx.currentTime)
+      oscillator.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.1)
+      gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1)
+      oscillator.start(audioCtx.currentTime)
+      oscillator.stop(audioCtx.currentTime + 0.1)
+      break
+    case 'hit':
+      // Funny whack sound
+      oscillator.type = 'square'
+      oscillator.frequency.setValueAtTime(200, audioCtx.currentTime)
+      oscillator.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.15)
+      gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15)
+      oscillator.start(audioCtx.currentTime)
+      oscillator.stop(audioCtx.currentTime + 0.15)
+      break
+    case 'miss':
+      // Sad descending sound
+      oscillator.type = 'sine'
+      oscillator.frequency.setValueAtTime(400, audioCtx.currentTime)
+      oscillator.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.3)
+      gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3)
+      oscillator.start(audioCtx.currentTime)
+      oscillator.stop(audioCtx.currentTime + 0.3)
+      break
+    case 'gameover':
+      // Game over - sad melody
+      const notes = [400, 350, 300, 200]
+      notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator()
+        const gain = audioCtx.createGain()
+        osc.connect(gain)
+        gain.connect(audioCtx.destination)
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.2)
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime + i * 0.2)
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.2 + 0.2)
+        osc.start(audioCtx.currentTime + i * 0.2)
+        osc.stop(audioCtx.currentTime + i * 0.2 + 0.2)
+      })
+      break
+    case 'score':
+      // Happy score sound
+      oscillator.type = 'sine'
+      oscillator.frequency.setValueAtTime(500, audioCtx.currentTime)
+      oscillator.frequency.setValueAtTime(700, audioCtx.currentTime + 0.1)
+      gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2)
+      oscillator.start(audioCtx.currentTime)
+      oscillator.stop(audioCtx.currentTime + 0.2)
+      break
+  }
+}
+
 function App() {
   const [gameState, setGameState] = useState<GameState>('idle')
   const [score, setScore] = useState(0)
@@ -57,6 +125,7 @@ function App() {
     const randomHole = availableHoles[Math.floor(Math.random() * availableHoles.length)]
     molesRef.current = molesRef.current.map(m => m.id === randomHole ? { ...m, isUp: true } : m)
     setMoles([...molesRef.current])
+    playSound('pop') // Pop sound when mole appears
 
     // Mole goes down after speed time
     moleTimerRef.current = window.setTimeout(() => {
@@ -66,9 +135,11 @@ function App() {
       // If mole went down without being hit, lose a life
       const mole = molesRef.current.find(m => m.id === randomHole)
       if (!mole?.isHit && gameState === 'playing') {
+        playSound('miss') // Sad sound when you miss
         setLives(prev => {
           const newLives = prev - 1
           if (newLives <= 0) {
+            playSound('gameover')
             setGameState('gameover')
           }
           return newLives
@@ -97,6 +168,7 @@ function App() {
     // Mark as hit
     molesRef.current = molesRef.current.map(m => m.id === holeId ? { ...m, isHit: true, isUp: false } : m)
     setMoles([...molesRef.current])
+    playSound('hit') // Funny whack sound
 
     // Calculate points
     let points = 10
@@ -114,6 +186,7 @@ function App() {
     }
 
     setScore(prev => prev + points)
+    playSound('score') // Happy sound when scoring
     
     // Show hit effect
     const hitEmoji = HIT_SOUNDS[Math.floor(Math.random() * HIT_SOUNDS.length)]
